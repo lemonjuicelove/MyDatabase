@@ -13,7 +13,7 @@ public class Transaction {
 
     public long xid; // 事务的自增id
 
-    public int level; // 事务的隔离级别
+    public int level; // 事务的隔离级别：0为读已提交，1为可重复读
 
     public Map<Long,Boolean> snapshot; // 记录事务开始时正在活跃的事务
 

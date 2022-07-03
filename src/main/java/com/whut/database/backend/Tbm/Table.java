@@ -3,11 +3,13 @@ package com.whut.database.backend.Tbm;
 import com.google.common.primitives.Bytes;
 import com.sun.javafx.collections.MappingChange;
 import com.whut.database.backend.TM.TransactionManagerImpl;
+import com.whut.database.backend.Tbm.Field.ParseValueRes;
 import com.whut.database.backend.parser.statement.*;
 import com.whut.database.backend.utils.Panic;
 import com.whut.database.backend.utils.ParseStringRes;
 import com.whut.database.backend.utils.Parser;
 import com.whut.database.common.Error;
+import org.checkerframework.checker.units.qual.C;
 
 import java.util.*;
 
@@ -237,5 +239,139 @@ public class Table {
         return sb.toString();
     }
 
+    /*
+        获取列名和列值
+     */
+    private Map<String,Object> parseEntry(byte[] raw){
+        int pos = 0;
+        Map<String,Object> entry = new HashMap<>();
+        for (Field field : fields) {
+            ParseValueRes res = field.parseValue(Arrays.copyOfRange(raw, pos, raw.length));
+            entry.put(field.fieldName,res.value);
+            pos += res.shift;
+        }
+        return entry;
+    }
+
+    /*
+        打印一条记录
+     */
+    private String printEntry(Map<String,Object> entry){
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        for (int i = 0; i < fields.size(); i++) {
+            Field field = fields.get(i);
+            sb.append(field.printValue(entry.get(field.fieldName)));
+            if (i == fields.size() - 1) sb.append("]");
+            else sb.append(",");
+        }
+        return sb.toString();
+    }
+
+    /*
+        解析Where条件，选择出符合条件的uids
+     */
+    private List<Long> parseWhere(Where where) throws Exception{
+        long l0 = 0;
+        long r0 = 0;
+        long l1 = 0;
+        long r1 = 0;
+        Field field = null;
+        boolean single = false;
+
+        if (where == null){
+            for (Field fd : fields) {
+                if (fd.isIndexed()){
+                    field = fd;
+                    break;
+                }
+            }
+            l0 = 0;
+            r0 = Long.MAX_VALUE;
+            single = true;
+        }else{
+            for (Field fd : fields) {
+                if (fd.fieldName.equals(where.singleExp1.field)){
+                    if(!field.isIndexed()){ // where条件的字段必须是索引字段
+                        throw Error.FieldNotIndexedException;
+                    }
+                    field = fd;
+                    break;
+                }
+            }
+            if (field == null) throw Error.FieldNotFoundException;
+
+            CalWhereRes res = calWhere(field,where);
+            l0 = res.l0;
+            r0 = res.r0;
+            l1 = res.l1;
+            r1 = res.r1;
+            single = res.single;
+        }
+
+        List<Long> uids = field.search(l0,r0);
+        if (!single){
+            List<Long> tmp = field.search(l1,r1);
+            uids.addAll(tmp);
+        }
+
+        return uids;
+    }
+
+    class CalWhereRes{
+        long l0,r0,l1,r1;
+        boolean single;
+    }
+
+
+    private CalWhereRes calWhere(Field fd, Where where) throws Exception{
+        CalWhereRes res = new CalWhereRes();
+        FieldCalRes fRes = null;
+        switch (where.logicOp){
+            case "":
+                res.single = true;
+                fRes = fd.calExp(where.singleExp1);
+                res.l0 = fRes.left;
+                res.r0 = fRes.right;
+                break;
+            case "and":
+                res.single = true;
+                fRes = fd.calExp(where.singleExp1);
+                res.l0 = fRes.left;
+                res.r0 = fRes.right;
+                fRes = fd.calExp(where.singleExp2);
+                res.l1 = fRes.left;
+                res.r1 = fRes.right;
+
+                // 取条件的交集部分
+                if(res.l1 > res.l0) res.l0 = res.l1;
+                if (res.r1 < res.r0) res.r0 = res.r1;
+                break;
+            case "or":
+                res.single = false;
+                fRes = fd.calExp(where.singleExp1);
+                res.l0 = fRes.left;
+                res.r0 = fRes.right;
+                fRes = fd.calExp(where.singleExp2);
+                res.l1 = fRes.left;
+                res.r1 = fRes.right;
+            default:
+                throw Error.InvalidLogOpException;
+        }
+
+        return res;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{").append(name).append("：");
+        for(int i = 0; i < fields.size(); i++){
+            sb.append(fields.get(i).toString());
+            if (i == fields.size()-1) sb.append("}");
+            else sb.append(",");
+        }
+        return sb.toString();
+    }
 
 }

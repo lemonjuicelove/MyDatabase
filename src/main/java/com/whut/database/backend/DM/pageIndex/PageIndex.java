@@ -18,6 +18,7 @@ public class PageIndex {
     private List<PageInfo>[] lists; // 存储页面索引
     private Lock lock;
 
+    @SuppressWarnings("unchecked")
     public PageIndex() {
         lock = new ReentrantLock();
         lists = new List[INTERVALS_NO+1];

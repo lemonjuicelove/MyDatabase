@@ -50,6 +50,7 @@ public interface Logger {
 
         try {
             raf = new RandomAccessFile(file,"rw");
+            fc = raf.getChannel();
         }catch (FileNotFoundException e) {
             Panic.panic(e);
         }

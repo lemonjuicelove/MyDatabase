@@ -186,7 +186,7 @@ public class Field {
     }
 
     class ParseValueRes{
-        Object v;
+        Object value;
         int shift;
     }
 
@@ -194,16 +194,16 @@ public class Field {
         ParseValueRes res = new ParseValueRes();
         switch (fieldType){
             case "int32":
-                res.v = Parser.parseInt(Arrays.copyOf(raw,4));
+                res.value = Parser.parseInt(Arrays.copyOf(raw,4));
                 res.shift = 4;
                 break;
             case "int64":
-                res.v = Parser.parseInt(Arrays.copyOf(raw,8));
+                res.value = Parser.parseInt(Arrays.copyOf(raw,8));
                 res.shift = 8;
                 break;
             case "string":
                 ParseStringRes r = Parser.parseString(raw);
-                res.v = r.str;
+                res.value = r.str;
                 res.shift = r.next;
         }
         return res;
